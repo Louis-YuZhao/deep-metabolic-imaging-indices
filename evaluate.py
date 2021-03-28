@@ -1,5 +1,5 @@
 """
-code for paper titled "Identifying a deep metabolic imaging biomarker to support computer-aided differential diagnosis of Parkinsonism using artificial intelligence"
+code for paper titled "Differential diagnosis of parkinsonism with deep metabolic imaging biomarker – an artificial intelligence-aided multi-center FDG PET study"
 finished by Yu Zhao 
 University of Bern
 Technical University of Munich
