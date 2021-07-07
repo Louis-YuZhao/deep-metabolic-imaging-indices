@@ -1,7 +1,7 @@
 # deep-metabolic-imaging-biomarker-
 code for paper titled "Differential diagnosis of parkinsonism with deep metabolic imaging biomarker" 
 
-finished by Yu Zhao, University of Bern and Technical University of Munich 
+by Yu Zhao, University of Bern and Technical University of Munich 
 
 last modified 07.21.2020
 
