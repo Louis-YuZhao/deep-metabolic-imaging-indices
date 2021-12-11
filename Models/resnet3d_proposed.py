@@ -1,50 +1,54 @@
-"""
-code for paper titled "Identifying a deep metabolic imaging biomarker to support computer-aided differential diagnosis of Parkinsonism using artificial intelligence"
-finished by Yu Zhao 
-University of Bern
-Technical University of Munich
-last modified 07.21.2020
-"""
 import sys
 sys.path.append("..")
 from config import config
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]= config['gpu_num']
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]=config['gpu_num']
 
 from keras.layers import Input, Add, Activation 
 from keras.layers import Conv3D, UpSampling3D,SpatialDropout3D
 from keras.layers import LeakyReLU, BatchNormalization
-from keras.layers import MaxPooling3D, GlobalMaxPooling3D, Flatten, Dense
+from keras.layers import MaxPooling3D, GlobalMaxPooling3D, GlobalAveragePooling3D, Flatten, Dense
 from keras.engine import Model
 from keras.optimizers import Adam
 from keras.regularizers import l2
+# from tensorflow_addons.layers import InstanceNormalization
+# from tensorflow_addons.layers import GroupNormalization
 from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
 from keras_contrib.layers.normalization.groupnormalization import GroupNormalization
 # GroupNormalization(groups=2, axis=-1, epsilon=0.1)
 from Models.metrics import weighted_dice_coefficient_loss
-# from keras import backend as K
-# K.image_data_format() == "channels_last"
+from keras import backend as K
+K.image_data_format() == "channels_last"
 
 dimz = config['dimz']
 dimx = config['dimx']
 dimy = config['dimy']
 channelNum = config['channelNum']
 
-def resnet3d_model(input_shape=(dimz, dimx, dimy, channelNum), num_outputs=4, 
-                    n_base_filters=16, depth=5, dropout_rate=0.3,
-                    optimizer=Adam, initial_learning_rate=5e-4,loss_function=weighted_dice_coefficient_loss,
-                    kernel_reg_factor=1e-4, ifbase=False):
+def resnet3d_model(input_shape=(dimz, dimx, dimy, channelNum), 
+                    num_outputs=4, 
+                    n_base_filters=16, 
+                    depth=5, 
+                    dropout_rate=0.3,
+                    optimizer=Adam, 
+                    initial_learning_rate=5e-4,
+                    kernel_reg_factor=1e-4, 
+                    ifbase = False,
+                    ifcompile = False):
     """
-    :param input_shape:
-    :param n_base_filters:
-    :param depth:
-    :param dropout_rate:
-    :param n_labels:
-    :param optimizer:
-    :param initial_learning_rate:
-    :param loss_function:
-    :param activation_name:
-    :return:
+    Input:
+    input_shape:
+    n_base_filters:
+    depth:
+    dropout_rate:
+    n_labels:
+    optimizer:
+    initial_learning_rate:
+    loss_function:
+    activation_name:
+    
+    Output:
     """
     inputs = Input(input_shape)
 
@@ -70,37 +74,37 @@ def resnet3d_model(input_shape=(dimz, dimx, dimy, channelNum), num_outputs=4,
         current_layer = summation_layer
 
     output_layer = create_convolution_block(summation_layer, n_level_filters, kernel=(1, 1, 1))
-    pool1 = GlobalMaxPooling3D(data_format='channels_last')(output_layer)
+    pool1 = GlobalAveragePooling3D(data_format='channels_last')(output_layer)
 
     if ifbase == True:
         model = Model(inputs=inputs, outputs=pool1)
         return model
     else: 
-        flatten1 = Flatten()(pool1)
         if num_outputs > 1:
             dense = Dense(units=num_outputs,
                         kernel_initializer="he_normal",
                         activation="softmax",
-                        kernel_regularizer=l2(kernel_reg_factor))(flatten1)
+                        kernel_regularizer=l2(kernel_reg_factor))(pool1)
         else:
             dense = Dense(units=num_outputs,
                         kernel_initializer="he_normal",
                         activation="sigmoid",
-                        kernel_regularizer=l2(kernel_reg_factor))(flatten1)
+                        kernel_regularizer=l2(kernel_reg_factor))(pool1)
         model = Model(inputs=inputs, outputs=dense)
-    model.compile(optimizer=optimizer(lr=initial_learning_rate), loss=loss_function)
-    return model
+        if ifcompile == True:
+            model.compile(optimizer=optimizer(lr=initial_learning_rate), loss='categorical_crossentropy', metrics=['accuracy'])
+        return model
 
 def create_convolution_block(input_layer, n_filters, kernel=(3, 3, 3), activation=LeakyReLU,
                              padding='same', strides=(1, 1, 1), normMethod = 'instance_norm'):
     """
-    :param strides:
-    :param input_layer:
-    :param n_filters:
-    :param batch_normalization:
-    :param kernel:
-    :param activation: Keras activation layer to use. (default is 'relu')
-    :param padding:
+    :strides:
+    :input_layer:
+    :n_filters:
+    :batch_normalization:
+    :kernel:
+    :activation: Keras activation layer to use. (default is 'relu')
+    :padding:
     :return:
     """
     layer = Conv3D(n_filters, kernel, padding=padding, strides=strides)(input_layer)

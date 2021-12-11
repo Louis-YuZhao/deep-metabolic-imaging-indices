@@ -1,7 +1,6 @@
-"""A updated 3D resnet implementation.
+"""A vanilla 3D resnet implementation.
 
 Based on Raghavendra Kotikalapudi's 2D implementation
-modified to 3d by yuzhao TUM 
 keras-resnet (See https://github.com/raghakot/keras-resnet.)
 """
 
@@ -11,23 +10,21 @@ import sys
 sys.path.append("..")
 import os
 from config import config
-os.environ["CUDA_VISIBLE_DEVICES"] = config['gpu_num']
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]=config['gpu_num']
 from keras.models import Model
-from keras.layers import Input, Activation, Dense, Flatten
+from keras.layers import Input, Activation, Dense, Flatten, GlobalMaxPooling3D, GlobalAveragePooling3D
 from keras.layers.convolutional import Conv3D, AveragePooling3D, MaxPooling3D
 from keras.layers.merge import add
-from keras.layers import LeakyReLU
 from keras.layers.normalization import BatchNormalization
-from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
-from keras_contrib.layers.normalization.groupnormalization import GroupNormalization
 from keras.regularizers import l2
 from keras import backend as K
 K.image_data_format() == "channels_last"
 
 def _bn_relu(input):
     """Helper to build a BN -> relu block (by @raghakot)."""
-    norm = InstanceNormalization(axis=CHANNEL_AXIS)(input)
-    return LeakyReLU(norm)
+    norm = BatchNormalization(axis=CHANNEL_AXIS)(input)
+    return Activation("relu")(norm)
 
 def _conv_bn_relu3D(**conv_params):
     filters = conv_params["filters"]
@@ -199,7 +196,12 @@ class Resnet3DBuilder(object):
     """ResNet3D."""
 
     @staticmethod
-    def build(input_shape, num_outputs, block_fn, repetitions, reg_factor,ifbase):
+    def build(input_shape, 
+              num_outputs, 
+              block_fn, 
+              repetitions, 
+              reg_factor,
+              ifbase):
         """Instantiate a vanilla ResNet3D keras model.
 
         # Arguments
@@ -227,7 +229,7 @@ class Resnet3DBuilder(object):
         block_fn = _get_block(block_fn)
         input = Input(shape=input_shape)
         # first conv
-        conv1 = _conv_bn_relu3D(filters=64, kernel_size=(5, 5, 5),
+        conv1 = _conv_bn_relu3D(filters=64, kernel_size=(7, 7, 7),
                                 strides=(2, 2, 2),
                                 kernel_regularizer=l2(reg_factor)
                                 )(input)
@@ -236,7 +238,7 @@ class Resnet3DBuilder(object):
 
         # repeat blocks
         block = pool1
-        filters = 32
+        filters = 64
         for i, r in enumerate(repetitions):
             block = _residual_block3d(block_fn, filters=filters,
                                       kernel_regularizer=l2(reg_factor),
@@ -248,31 +250,51 @@ class Resnet3DBuilder(object):
         block_output = _bn_relu(block)
 
         # average poll and classification
-        pool2 = AveragePooling3D(pool_size=(block._keras_shape[DIM1_AXIS],
-                                            block._keras_shape[DIM2_AXIS],
-                                            block._keras_shape[DIM3_AXIS]),
-                                 strides=(1, 1, 1))(block_output)
+        pool2 = GlobalAveragePooling3D(data_format='channels_last')(block_output)
         if ifbase == True:
             model = Model(inputs=input, outputs=pool2)
             return model
         else: 
-            flatten1 = Flatten()(pool2)
             if num_outputs > 1:
                 dense = Dense(units=num_outputs,
                             kernel_initializer="he_normal",
                             activation="softmax",
-                            kernel_regularizer=l2(reg_factor))(flatten1)
+                            kernel_regularizer=l2(reg_factor))(pool2)
             else:
                 dense = Dense(units=num_outputs,
                             kernel_initializer="he_normal",
                             activation="sigmoid",
-                            kernel_regularizer=l2(reg_factor))(flatten1)
+                            kernel_regularizer=l2(reg_factor))(pool2)
 
-            model = Model(inputs=input, outputs=dense)
+            model = Model(inputs=input, outputs=dense)            
             return model
 
     @staticmethod
     def build_resnet_18(input_shape, num_outputs, reg_factor=1e-4, ifbase=False):
         """Build resnet 18."""
         return Resnet3DBuilder.build(input_shape, num_outputs, basic_block,
-                                     [1, 1, 1], reg_factor=reg_factor, ifbase=ifbase)
+                                     [2, 2, 2, 2], reg_factor=reg_factor, ifbase=ifbase)
+
+    @staticmethod
+    def build_resnet_34(input_shape, num_outputs, reg_factor=1e-4, ifbase=False):
+        """Build resnet 34."""
+        return Resnet3DBuilder.build(input_shape, num_outputs, basic_block,
+                                     [3, 4, 6, 3], reg_factor=reg_factor, ifbase=ifbase)
+
+    @staticmethod
+    def build_resnet_50(input_shape, num_outputs, reg_factor=1e-4, ifbase=False):
+        """Build resnet 50."""
+        return Resnet3DBuilder.build(input_shape, num_outputs, bottleneck,
+                                     [3, 4, 6, 3], reg_factor=reg_factor, ifbase=ifbase)
+
+    @staticmethod
+    def build_resnet_101(input_shape, num_outputs, reg_factor=1e-4, ifbase=False):
+        """Build resnet 101."""
+        return Resnet3DBuilder.build(input_shape, num_outputs, bottleneck,
+                                     [3, 4, 23, 3], reg_factor=reg_factor, ifbase=ifbase)
+
+    @staticmethod
+    def build_resnet_152(input_shape, num_outputs, reg_factor=1e-4, ifbase=False):
+        """Build resnet 152."""
+        return Resnet3DBuilder.build(input_shape, num_outputs, bottleneck,
+                                     [3, 8, 36, 3], reg_factor=reg_factor, ifbase=ifbase)

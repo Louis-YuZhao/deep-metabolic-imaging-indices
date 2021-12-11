@@ -4,9 +4,11 @@ import sys
 sys.path.append("..")
 from config import config
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]= config['gpu_num']
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]=config['gpu_num']
 from keras import backend as K
 K.image_data_format() == "channels_last"
+from skimage.transform import resize
 
 def dice_coefficient(y_true, y_pred, smooth=1.):
     y_true_f = K.flatten(y_true)
