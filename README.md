@@ -46,7 +46,7 @@ The accuracy of the deep metabolic imaging (DMI) biomarker in the development ph
 
     python prepareData.py --data_folder Input_directory_path --project_folder project_folder --image_ext '*.img' --CV_fold 6 --data_norm
 
-(4) trainging the model:
+(4) training the model:
     
     python train.py --project_folder project_folder --baseModeType 'resnew' --optType 'adam' --epochs 50 --CV_fold 6 --currentFold 1 --learning_rate = 0.0001
 
