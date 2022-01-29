@@ -1,4 +1,4 @@
-# deep-metabolic-imaging-biomarker
+# deep-metabolic-imaging-indices
 Code for paper titled "Differential diagnosis of parkinsonism with deep metabolic imaging indices" 
 
 by Yu Zhao, University of Bern and Technical University of Munich 
