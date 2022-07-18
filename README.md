@@ -58,4 +58,3 @@ The accuracy of the deep metabolic imaging (DMI) biomarker in the development ph
 
     python test.py --data_folder Input_testdata_directory_path --image_ext '*.img' --data_norm --project_folder project_folder --baseModeType 'resnew' --CV_fold 6
 
-
